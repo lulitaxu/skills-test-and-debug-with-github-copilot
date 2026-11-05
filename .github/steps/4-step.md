@@ -8,7 +8,7 @@ Rounding each person's share independently can lose or invent money. A robust ap
 
 ### ⌨️ Activity: Repair and simplify the implementation
 
-![Codespaces workspace showing the integer-cent repair, the approved Copilot plan, the review checklist, and the complete test suite passing](../images/activity-repair-implementation.png)
+![Codespaces workspace showing the integer-cent repair, the approved Copilot plan, the review checklist, and the complete test suite passing](https://github.com/lulitaxu/skills-test-and-debug-with-github-copilot/blob/main/.github/images/activity-repair-implementation.png?raw=true)
 
 1. In **Copilot Chat**, provide `src/bill_splitter.py`, the two failing tests, and the diagnosis from the previous step. Ask for a plan that:
 

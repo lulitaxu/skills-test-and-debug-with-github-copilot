@@ -8,7 +8,7 @@ AI-assisted code should receive the same review as any other code. Inspect the d
 
 ### ⌨️ Activity: Open and review the pull request
 
-![GitHub pull request showing the Verification and Copilot review sections, passing checks, Files changed tab, and focused file list](../images/activity-review-pull-request.png)
+![GitHub pull request showing the Verification and Copilot review sections, passing checks, Files changed tab, and focused file list](https://github.com/lulitaxu/skills-test-and-debug-with-github-copilot/blob/main/.github/images/activity-review-pull-request.png?raw=true)
 
 1. In the **Codespace terminal**, inspect the final diff and rerun all tests:
 
