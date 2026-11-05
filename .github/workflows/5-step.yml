@@ -1,0 +1,165 @@
+name: Step 5
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions: {}
+
+concurrency:
+  group: step-5-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  REVIEW_FILE: ".github/steps/x-review.md"
+
+jobs:
+  find_exercise:
+    if: ${{ !github.event.repository.is_template }}
+    name: Find Exercise Issue
+    uses: skills/exercise-toolkit/.github/workflows/find-exercise-issue.yml@v0.9.3
+    permissions:
+      contents: read
+      issues: read
+
+  check_step_work:
+    if: ${{ !github.event.repository.is_template }}
+    name: Check step work
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      milestones-passed: ${{ steps.check-milestones.outcome == 'success' }}
+      reflection-passed: ${{ steps.check-reflection.outcome == 'success' }}
+      tests-passed: ${{ steps.check-tests.outcome == 'success' }}
+    env:
+      PR_BODY: ${{ github.event.pull_request.body }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Check pull request reflection
+        id: check-reflection
+        continue-on-error: true
+        run: python .github/grading/check_pr_body.py
+
+      - name: Recheck all learner milestones
+        id: check-milestones
+        continue-on-error: true
+        run: |
+          python .github/grading/check_notes.py
+          python .github/grading/check_tests.py focused
+          python .github/grading/check_tests.py edges
+
+      - name: Run complete test suite
+        id: check-tests
+        continue-on-error: true
+        run: python -m pytest -q tests .github/grading/test_solution.py
+
+  post_review_content:
+    name: Post review content
+    needs: [find_exercise, check_step_work]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+      issues: write
+    env:
+      ISSUE_REPOSITORY: ${{ github.repository }}
+      ISSUE_NUMBER: ${{ needs.find_exercise.outputs.issue-number }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Get response templates
+        uses: actions/checkout@v6
+        with:
+          repository: skills/exercise-toolkit
+          path: exercise-toolkit
+          ref: v0.9.3
+
+      - name: Find last comment
+        id: find-last-comment
+        uses: peter-evans/find-comment@v4
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          direction: last
+
+      - name: Update comment - step results
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          comment-id: ${{ steps.find-last-comment.outputs.comment-id }}
+          edit-mode: replace
+          file: exercise-toolkit/markdown-templates/step-feedback/step-results-table.md
+          vars: |
+            step_number: 5
+            results_table:
+              - description: "Investigation notes and all required focused and edge tests are still present and meaningful"
+                passed: ${{ needs.check_step_work.outputs.milestones-passed == 'true' }}
+              - description: "Pull request documents test evidence and a critically reviewed Copilot suggestion"
+                passed: ${{ needs.check_step_work.outputs.reflection-passed == 'true' }}
+              - description: "Visible and additional tests pass on the pull request"
+                passed: ${{ needs.check_step_work.outputs.tests-passed == 'true' }}
+            tips:
+              - "Add substantive ## Verification and ## Copilot review sections to the pull request description."
+              - "If you edit only the description, this workflow retriggers automatically."
+
+      - name: Stop if checks failed
+        if: |
+          needs.check_step_work.outputs.milestones-passed != 'true' ||
+          needs.check_step_work.outputs.reflection-passed != 'true' ||
+          needs.check_step_work.outputs.tests-passed != 'true'
+        run: exit 1
+
+      - name: Create comment - step finished
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: exercise-toolkit/markdown-templates/step-feedback/lesson-review.md
+
+      - name: Create comment - add review content
+        uses: GrantBirki/comment@v2.1.1
+        with:
+          repository: ${{ env.ISSUE_REPOSITORY }}
+          issue-number: ${{ env.ISSUE_NUMBER }}
+          file: ${{ env.REVIEW_FILE }}
+
+      - name: Disable current workflow
+        run: gh workflow disable "${{ github.workflow }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  finish_exercise:
+    name: Finish Exercise
+    needs: [find_exercise, post_review_content]
+    uses: skills/exercise-toolkit/.github/workflows/finish-exercise.yml@v0.9.3
+    permissions:
+      contents: write
+      issues: write
+    with:
+      issue-url: ${{ needs.find_exercise.outputs.issue-url }}
+      exercise-title: "Test and Debug with GitHub Copilot"

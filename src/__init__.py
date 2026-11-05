@@ -1,0 +1,1 @@
+"""FairShare bill splitting package."""
